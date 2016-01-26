@@ -33,7 +33,7 @@ newoption { trigger = "libdir", description = "Directory for libraries (typicall
 -- Root directory of project checkout relative to this .lua file
 rootdir = "../.."
 
-dofile("extern_libs4.lua")
+dofile("extern_libs5.lua")
 
 -- detect compiler for non-Windows
 if os.is("macosx") then
@@ -93,8 +93,8 @@ else
 	end
 end
 
--- Set up the Solution
-solution "pyrogenesis"
+-- Set up the Workspace
+workspace "pyrogenesis"
 targetdir(rootdir.."/binaries/system")
 libdirs(rootdir.."/binaries/system")
 if not _OPTIONS["outpath"] then
@@ -105,7 +105,6 @@ configurations { "Release", "Debug" }
 
 -- Get some environement specific information used later.
 if os.is("windows") then
-	nasmpath(rootdir.."/build/bin/nasm.exe")
 	lcxxtestpath = rootdir.."/build/bin/cxxtestgen.exe"
 else
 
@@ -142,21 +141,21 @@ function project_set_target(project_name)
 
 	local obj_dir_prefix = _OPTIONS["outpath"].."/obj/"..project_name.."_"
 
-	configuration "Debug"
+	filter "Debug"
 		objdir(obj_dir_prefix.."Debug")
 		targetsuffix("_dbg")
 
-	configuration "Release"
+	filter "Release"
 		objdir(obj_dir_prefix.."Release")
 
-	configuration { }
+	filter { }
 
 end
 
 
 function project_set_build_flags()
 
-	flags { "NoEditAndContinue" }
+	editandcontinue "Off"
 
 	if not _OPTIONS["minimal-flags"] then
 		flags { "Symbols" }
@@ -164,25 +163,25 @@ function project_set_build_flags()
 
 	if cc ~= "icc" and (os.is("windows") or not _OPTIONS["minimal-flags"]) then
 		-- adds the -Wall compiler flag
-		flags { "ExtraWarnings" } -- this causes far too many warnings/remarks on ICC
+		warnings "Extra" -- this causes far too many warnings/remarks on ICC
 	end
 
 	-- disable Windows debug heap, since it makes malloc/free hugely slower when
 	-- running inside a debugger
-	if os.is("windows") then
-		flags { "NoDebugHeap" }
-	end
+	-- if os.is("windows") then
+	-- 	flags { "NoDebugHeap" }
+	-- end
 
-	configuration "Debug"
+	filter "Debug"
 		defines { "DEBUG" }
 
-	configuration "Release"
+	filter "Release"
 		if os.is("windows") or not _OPTIONS["minimal-flags"] then
-			flags { "OptimizeSpeed" }
+			optimize "Speed"
 		end
 		defines { "NDEBUG", "CONFIG_FINAL=1" }
 
-	configuration { }
+	filter { }
 
 	if _OPTIONS["gles"] then
 		defines { "CONFIG2_GLES=1" }
@@ -212,11 +211,11 @@ function project_set_build_flags()
 	if os.is("windows") then
 
 		-- use native wchar_t type (not typedef to unsigned short)
-		flags { "NativeWChar" }
+		nativewchar "on"
 
 	else	-- *nix
 
-		-- TODO, FIXME: This check is incorrect because it means that some additional flags will be added inside the "else" branch if the 
+		-- TODO, FIXME: This check is incorrect because it means that some additional flags will be added inside the "else" branch if the
 		-- compiler is ICC and minimal-flags is specified (ticket: #2994)
 		if cc == "icc" and not _OPTIONS["minimal-flags"] then
 			buildoptions {
@@ -231,9 +230,9 @@ function project_set_build_flags()
 				"-Wunused-function",
 				"-wd1292" -- avoid lots of 'attribute "__nonnull__" ignored'
 			}
-			configuration "Debug"
+			filter "Debug"
 				buildoptions { "-O0" } -- ICC defaults to -O2
-			configuration { }
+			filter { }
 			if os.is("macosx") then
 				linkoptions { "-multiply_defined","suppress" }
 			end
@@ -296,7 +295,7 @@ function project_set_build_flags()
 					}
 				end
 			end
-			
+
 			buildoptions {
 				-- Enable C++11 standard.
 				"-std=c++0x"
@@ -379,7 +378,7 @@ function project_set_build_flags()
 
 				-- Adding the executable path and taking care of correct escaping
 				if _ACTION == "gmake" then
-					linkoptions { "-Wl,-rpath,'$$ORIGIN'" } 
+					linkoptions { "-Wl,-rpath,'$$ORIGIN'" }
 				elseif _ACTION == "codeblocks" then
 					linkoptions { "-Wl,-R\\\\$$$ORIGIN" }
 				end
@@ -474,7 +473,7 @@ function project_add_contents(source_root, rel_source_dirs, rel_include_dirs, ex
 	-- * precompiled.cpp (needed to "Create" the PCH) also goes in
 	--   the abovementioned dir.
 	if (not _OPTIONS["without-pch"] and not extra_params["no_pch"]) then
-		pchheader(pch_dir.."precompiled.h")
+		pchheader("precompiled.h") -- this has to match the #include line for VS
 		pchsource(pch_dir.."precompiled.cpp")
 		defines { "USING_PCH" }
 		files { pch_dir.."precompiled.h", pch_dir.."precompiled.cpp" }
@@ -545,7 +544,7 @@ function setup_static_lib_project (project_name, rel_source_dirs, extern_libs, e
 	end
 
 	if os.is("windows") then
-		flags { "NoRTTI" }
+		rtti "off"
 	end
 end
 
@@ -568,7 +567,7 @@ function setup_shared_lib_project (project_name, rel_source_dirs, extern_libs, e
 	end
 
 	if os.is("windows") then
-		flags { "NoRTTI" }
+		rtti "off"
 		links { "delayimp" }
 	end
 end
@@ -607,10 +606,10 @@ function setup_all_libs ()
 		"boost",
 	}
 	setup_third_party_static_lib_project("tinygettext", source_dirs, extern_libs, { } )
-	
+
 	-- it's an external library and we don't want to modify its source to fix warnings, so we just disable them to avoid noise in the compile output
 	if _ACTION == "vs2013" then
-		buildoptions { 
+		buildoptions {
 			"/wd4127",
 			"/wd4309",
 			"/wd4800",
@@ -730,12 +729,12 @@ function setup_all_libs ()
 		"icu",
 		"iconv",
 	}
-	
+
 	if not _OPTIONS["without-audio"] then
 		table.insert(extern_libs, "openal")
 		table.insert(extern_libs, "vorbis")
 	end
-	
+
 	setup_static_lib_project("engine", source_dirs, extern_libs, {})
 
 
@@ -844,7 +843,7 @@ function setup_all_libs ()
 	for i,v in pairs(sysdep_dirs[os.get()]) do
 		table.insert(source_dirs, v);
 	end
-	
+
 	if os.is("linux") then
 		if _OPTIONS["android"] then
 			table.insert(source_dirs, "lib/sysdep/os/android")
@@ -963,7 +962,7 @@ function setup_main_exe ()
 		-- from "lowlevel" static lib; must be added here to be linked in
 		files { source_root.."lib/sysdep/os/win/error_dialog.rc" }
 
-		flags { "NoRTTI" }
+		rtti "off"
 
 		linkoptions {
 			-- wraps main thread in a __try block(see wseh.cpp). replace with mainCRTStartup if that's undesired.
@@ -1011,9 +1010,9 @@ function setup_main_exe ()
 		end
 
 		-- For debug_resolve_symbol
-		configuration "Debug"
+		filter "Debug"
 			linkoptions { "-rdynamic" }
-		configuration { }
+		filter { }
 
 	elseif os.is("macosx") then
 
@@ -1065,17 +1064,17 @@ function setup_atlas_project(project_name, target_type, rel_source_dirs, rel_inc
 		if target_type == "SharedLib" then
 			if _OPTIONS["macosx-bundle"] then
 				-- If we're building a bundle, it will be in ../Frameworks
-				configuration "Debug"
+				filter "Debug"
 					linkoptions { "-install_name @executable_path/../Frameworks/lib"..project_name.."_dbg.dylib" }
-				configuration "Release"
+				filter "Release"
 					linkoptions { "-install_name @executable_path/../Frameworks/lib"..project_name..".dylib" }
-				configuration { }
+				filter { }
 			else
-				configuration "Debug"
+				filter "Debug"
 					linkoptions { "-install_name @executable_path/lib"..project_name.."_dbg.dylib" }
-				configuration "Release"
+				filter "Release"
 					linkoptions { "-install_name @executable_path/lib"..project_name..".dylib" }
-				configuration { }
+				filter { }
 			end
 		end
 	end
@@ -1090,7 +1089,7 @@ function setup_atlas_projects()
 	{	-- src
 		".",
 		"../../../third_party/jsonspirit"
-		
+
 	},{	-- include
 		"../../../third_party/jsonspirit"
 	},{	-- extern_libs
@@ -1187,7 +1186,7 @@ function setup_atlas_frontend_project (project_name)
 
 		-- required to use WinMain() on Windows, otherwise will default to main()
 		flags { "WinMain" }
-		
+
 		-- see manifest.cpp
 		project_add_manifest()
 
@@ -1303,9 +1302,7 @@ end
 -- If no customizations are implemented for a specific action (e.g. vs2013), passing the
 -- parameters won't have any effects.
 function configure_cxxtestgen()
-
 	local lcxxtestrootfile = source_root.."test_root.cpp"
-	files { lcxxtestrootfile }
 
 	-- Define the options used for cxxtestgen
 	local lcxxtestoptions = "--have-std"
@@ -1324,30 +1321,9 @@ function configure_cxxtestgen()
 	lcxxtestrootoptions = lcxxtestrootoptions .. include
 	lcxxtestoptions = lcxxtestoptions .. include
 
-	-- Set all the parameters used in our cxxtestgen customization in premake.
-	cxxtestrootfile(lcxxtestrootfile)
-	cxxtestpath(lcxxtestpath)
-	cxxtestrootoptions(lcxxtestrootoptions)
-	cxxtestoptions(lcxxtestoptions)
-
-	-- The file paths needs to be made relative to the project directory for the prebuildcommands.
-	-- premake's paths are relative to premake4.lua by default.
-	lcxxtestrootfile = path.rebase(lcxxtestrootfile, path.getabsolute("."), _OPTIONS["outpath"])
-	lcxxtestpath = path.rebase(lcxxtestpath, path.getabsolute("."), _OPTIONS["outpath"])
-
-	-- On windows we have to use backlashes in our paths. We don't have to take care
-	-- of that for the parameters passed to our cxxtestgen customizations.
-	if os.is("windows") then
-		lcxxtestrootfile = path.translate(lcxxtestrootfile, "\\")
-		lcxxtestpath = path.translate(lcxxtestpath, "\\")
-	end
-
-	if _ACTION ~= "gmake" and _ACTION ~= "vs2013" then
-		prebuildcommands { lcxxtestpath.." --root "..lcxxtestrootoptions.." -o "..lcxxtestrootfile }
-	end
-
 	-- Find header files in 'test' subdirectories
 	local all_files = os.matchfiles(source_root .. "**/tests/*.h")
+	local test_files = {}
 	for i,v in pairs(all_files) do
 		-- Don't include sysdep tests on the wrong sys
 		-- Don't include Atlas tests unless Atlas is being built
@@ -1355,26 +1331,13 @@ function configure_cxxtestgen()
 		   not (string.find(v, "/tools/atlas/") and not _OPTIONS["atlas"]) and
 		   not (string.find(v, "/sysdep/arch/x86_x64/") and ((arch ~= "amd64") or (arch ~= "x86")))
 		then
-			local src_file = string.sub(v, 1, -3) .. ".cpp"
-			cxxtestsrcfiles { src_file }
-			files { src_file }
-			cxxtesthdrfiles { v }
-
-			if _ACTION ~= "gmake" and _ACTION ~= "vs2013" then
-				-- see detailed comment above.
-				src_file = path.rebase(src_file, path.getabsolute("."), _OPTIONS["outpath"])
-				v = path.rebase(v, path.getabsolute("."), _OPTIONS["outpath"])
-
-				if os.is("windows") then
-					src_file = path.translate(src_file, "\\")
-					v = path.translate(v, "\\")
-				end
-				prebuildcommands { lcxxtestpath.." --part "..lcxxtestoptions.." -o "..src_file.." "..v }
-			end
+			table.insert(test_files, v)
 		end
-
-
 	end
+
+	require "cxxtest"
+	cxxtest.path = lcxxtestpath
+	cxxtest.configure_project(lcxxtestrootfile, test_files, lcxxtestrootoptions, lcxxtestoptions)
 end
 
 
@@ -1386,11 +1349,11 @@ function setup_tests()
 	configure_cxxtestgen()
 
 	links { static_lib_names }
-	configuration "Debug"
+	filter "Debug"
 		links { static_lib_names_debug }
-	configuration "Release"
+	filter "Release"
 		links { static_lib_names_release }
-	configuration { }
+	filter { }
 
 	links { "mocks_test" }
 	if _OPTIONS["atlas"] then
@@ -1412,7 +1375,7 @@ function setup_tests()
 		-- from "lowlevel" static lib; must be added here to be linked in
 		files { source_root.."lib/sysdep/os/win/error_dialog.rc" }
 
-		flags { "NoRTTI" }
+		rtti "off"
 
 		-- see wstartup.h
 		linkoptions { "/INCLUDE:_wstartup_InitAndRegisterShutdown" }
@@ -1451,9 +1414,9 @@ function setup_tests()
 		end
 
 		-- For debug_resolve_symbol
-		configuration "Debug"
+		filter "Debug"
 			linkoptions { "-rdynamic" }
-		configuration { }
+		filter { }
 
 		includedirs { source_root .. "pch/test/" }
 	end
@@ -1472,11 +1435,11 @@ setup_all_libs()
 -- work when changing the static lib breakdown.
 project("pyrogenesis") -- Set the main project active
 	links { static_lib_names }
-	configuration "Debug"
+	filter "Debug"
 		links { static_lib_names_debug }
-	configuration "Release"
+	filter "Release"
 		links { static_lib_names_release }
-	configuration { }
+	filter { }
 
 if _OPTIONS["atlas"] then
 	setup_atlas_projects()

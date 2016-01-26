@@ -77,7 +77,7 @@ local function pkgconfig_libs(lib, alternative_cmd)
 		result_libs = string.gsub(result_libs, ",", " ")
 		result_libs = string.gsub(result_libs, "\n", "")
 		linkoptions { result_libs }
-	elseif _ACTION == "gmake" then	
+	elseif _ACTION == "gmake" then
 		gnuexternals { "`"..cmd_libs.."`" }
 	else
 		linkoptions { "`"..cmd_libs.."`" }
@@ -109,11 +109,11 @@ local function add_delayload(name, suffix, def)
 		local dbg_cmd = "/DELAYLOAD:" .. name .. suffix .. ".dll"
 		local cmd     = "/DELAYLOAD:" .. name .. ".dll"
 
-		configuration "Debug"
+		filter "Debug"
 			linkoptions { dbg_cmd }
-		configuration "Release"
+		filter "Release"
 			linkoptions { cmd }
-		configuration { }
+		filter { }
 	end
 
 end
@@ -158,11 +158,11 @@ local function add_default_links(def)
 		end
 	else
 		for i,name in pairs(names) do
-			configuration "Debug"
+			filter "Debug"
 				links { name .. suffix }
-			configuration "Release"
+			filter "Release"
 				links { name }
-			configuration { }
+			filter { }
 
 			add_delayload(name, suffix, def)
 		end
@@ -290,17 +290,17 @@ extern_lib_defs = {
 		link_settings = function()
 			add_source_lib_paths("fcollada")
 			if os.is("windows") then
-				configuration "Debug"
+				filter "Debug"
 					links { "FColladaD" }
-				configuration "Release"
+				filter "Release"
 					links { "FCollada" }
-			 	configuration { }
+			 	filter { }
 			else
-				configuration "Debug"
+				filter "Debug"
 					links { "FColladaSD" }
-				configuration "Release"
+				filter "Release"
 					links { "FColladaSR" }
-				configuration { }
+				filter { }
 			end
 		end,
 	},
@@ -483,11 +483,11 @@ extern_lib_defs = {
 		link_settings = function()
 			if os.is("windows") then
 				add_default_lib_paths("libxml2")
-				configuration "Debug"
+				filter "Debug"
 					links { "libxml2" }
-				configuration "Release"
+				filter "Release"
 					links { "libxml2" }
-				configuration { }
+				filter { }
 			elseif os.is("macosx") then
 				xml2_config_path = os.getenv("XML2_CONFIG")
 				if not xml2_config_path then
@@ -618,12 +618,12 @@ extern_lib_defs = {
 				else
 					include_dir = "include-unix"
 				end
-				configuration "Debug"
+				filter "Debug"
 					includedirs { libraries_source_dir.."spidermonkey/"..include_dir.."-debug" }
 					defines { "DEBUG" }
-				configuration "Release"
+				filter "Release"
 					includedirs { libraries_source_dir.."spidermonkey/"..include_dir.."-release" }
-				configuration { }
+				filter { }
 			end
 		end,
 		link_settings = function()
@@ -639,11 +639,11 @@ extern_lib_defs = {
 					add_default_lib_paths("nspr")
 					links { "nspr4", "plc4", "plds4" }
 				end
-				configuration "Debug"
+				filter "Debug"
 					links { "mozjs31-ps-debug" }
-				configuration "Release"
+				filter "Release"
 					links { "mozjs31-ps-release" }
-				configuration { }
+				filter { }
 				add_source_lib_paths("spidermonkey")
 			end
 		end,
