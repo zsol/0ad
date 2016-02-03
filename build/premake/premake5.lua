@@ -33,7 +33,9 @@ newoption { trigger = "libdir", description = "Directory for libraries (typicall
 -- Root directory of project checkout relative to this .lua file
 rootdir = "../.."
 
-dofile("extern_libs5.lua")
+require "gcc_linkorder_hack"
+
+dofile("extern_libs.lua")
 
 -- detect compiler for non-Windows
 if os.is("macosx") then
@@ -43,11 +45,7 @@ elseif os.is("linux") and _OPTIONS["icc"] then
 elseif not os.is("windows") then
 	cc = os.getenv("CC")
 	if cc == nil or cc == "" then
-		local hasgcc = os.execute("which gcc > .gccpath")
-		local f = io.open(".gccpath", "r")
-		local gccpath = f:read("*line")
-		f:close()
-		os.execute("rm .gccpath")
+		local gccpath = os.capture("which gcc")
 		if gccpath == nil then
 			cc = "clang"
 		else
@@ -58,8 +56,7 @@ end
 
 -- TODO: proper clang support
 if cc == "clang" then
-	premake.gcc.cc  = "clang"
-	premake.gcc.cxx = "clang++"
+   toolset "clang"
 end
 
 -- detect CPU architecture (simplistic, currently only supports x86, amd64 and ARM)
@@ -75,10 +72,7 @@ else
 	if arch == "x86_64" or arch == "amd64" then
 		arch = "amd64"
 	else
-		os.execute(cc .. " -dumpmachine > .gccmachine.tmp")
-		local f = io.open(".gccmachine.tmp", "r")
-		local machine = f:read("*line")
-		f:close()
+		local machine = os.capture(cc .. " -dumpmachine > .gccmachine.tmp")
 		if string.find(machine, "x86_64") == 1 or string.find(machine, "amd64") == 1 then
 			arch = "amd64"
 		elseif string.find(machine, "i.86") == 1 then
@@ -109,16 +103,6 @@ if os.is("windows") then
 else
 
 	lcxxtestpath = rootdir.."/libraries/source/cxxtest-4.4/bin/cxxtestgen"
-
-	if os.is("linux") and arch == "amd64" then
-		nasmformat "elf64"
-	elseif os.is("macosx") and arch == "amd64" then
-		nasmformat "macho64"
-	elseif os.is("macosx") then
-		nasmformat "macho"
-	else
-		nasmformat "elf"
-	end
 end
 
 source_root = rootdir.."/source/" -- default for most projects - overridden by local in others
@@ -1439,7 +1423,8 @@ project("pyrogenesis") -- Set the main project active
 		links { static_lib_names_debug }
 	filter "Release"
 		links { static_lib_names_release }
-	filter { }
+    filter { }
+
 
 if _OPTIONS["atlas"] then
 	setup_atlas_projects()

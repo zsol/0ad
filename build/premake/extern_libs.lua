@@ -53,12 +53,8 @@ local function pkgconfig_cflags(lib, alternative_cmd)
 		cmd_cflags = alternative_cmd
 	end
 
-	if _ACTION == "xcode3" or _ACTION == "xcode4" then
-		result_cflags = string.gsub(os.capture(cmd_cflags), "\n", "")
-		buildoptions { result_cflags }
-	else
-		buildoptions { "`"..cmd_cflags.."`" }
-	end
+	result_cflags = string.gsub(os.capture(cmd_cflags), "\n", "")
+	buildoptions { result_cflags }
 end
 
 local function pkgconfig_libs(lib, alternative_cmd)
@@ -70,18 +66,24 @@ local function pkgconfig_libs(lib, alternative_cmd)
 		cmd_libs = alternative_cmd
 	end
 
+	result_libs = " " .. string.gsub(os.capture(cmd_libs), "\n", " ")
+
 	if _ACTION == "xcode3" or _ACTION == "xcode4" then
 		-- The syntax of -Wl with the comma separated list doesn't work and -Wl apparently isn't needed in xcode.
 		-- This is a hack, but it works...
-		result_libs = string.gsub(os.capture(cmd_libs), "-Wl", "")
+		result_libs = string.gsub(result_libs, "-Wl", "")
 		result_libs = string.gsub(result_libs, ",", " ")
 		result_libs = string.gsub(result_libs, "\n", "")
-		linkoptions { result_libs }
-	elseif _ACTION == "gmake" then
-		gnuexternals { "`"..cmd_libs.."`" }
-	else
-		linkoptions { "`"..cmd_libs.."`" }
 	end
+
+
+	lib_names = string.gmatch(result_libs, "%s+%-l(%S+)")
+    result_libs = string.gsub(result_libs, "%s+%-l(%S+)", "")
+
+    linkoptions { result_libs }
+    for name in lib_names do
+       links { name }
+    end
 end
 
 function os.capture(cmd)
